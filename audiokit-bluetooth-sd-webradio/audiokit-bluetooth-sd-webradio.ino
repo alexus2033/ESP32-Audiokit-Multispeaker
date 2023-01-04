@@ -20,8 +20,6 @@
 #define ModeWebRadio 1
 #define ModeSDPlayer 2
 #define ModeBTSpeaker 3
-#define ModeAuxIN 4
-#define ModeMicIN 5
 
 #if DEBUG == 1
   #define debug(x) Serial.print(x)
@@ -65,13 +63,13 @@ const char* startFilePath="/";
 const char* ext="mp3";
 SdSpiConfig sdcfg(PIN_AUDIO_KIT_SD_CARD_CS, DEDICATED_SPI, SD_SCK_MHZ(10) , &AUDIOKIT_SD_SPI);
 AudioSourceSDFAT sourceSD(startFilePath, ext, sdcfg);
-int playerIDX = sourceSD.index();
+char displayName[40];
 
 //Web-Radio
-const char* network = "YOUR WIFI";
-const char* password = "SECRETPASSWORD";
 ICYStream inetStream(2048);
 AudioSourceURL sourceRadio(inetStream, urls, "audio/mp3");
+char network[50];
+char passwd[50]; //read details from SD-Card
 
 //MP3 & Player
 MP3DecoderHelix decoder;
@@ -85,11 +83,11 @@ bool pin_request = false;
 void setup() {
   Serial.begin(9600);
   AudioLogger::instance().begin(Serial, AudioLogger::Warning);
-  //LOGLEVEL_AUDIOKIT = AudioKitError;
-
+  LOGLEVEL_AUDIOKIT = AudioKitError;
+  
   // provide a2dp data
   a2dp_sink.set_stream_reader(read_data_stream, false);
-  a2dp_sink.set_avrc_metadata_callback(avrc_metadata_callback);
+  a2dp_sink.set_avrc_metadata_callback(bt_metadata_callback);
   a2dp_sink.activate_pin_code(true);
   //a2dp_sink.set_discoverability(ESP_BT_NON_DISCOVERABLE);
   
@@ -105,11 +103,11 @@ void setup() {
   kit.addAction(PIN_KEY3, btnPrevious);
   kit.addAction(PIN_KEY4, btnNext);
 
-  debugln(SD_CARD_INTR_GPIO);
   int detectSDPin = SD_CARD_INTR_GPIO;
   if (detectSDPin>0){
     pinMode(detectSDPin, INPUT_PULLUP);
   }
+  readWlanFile();
   startRadioPlayer();
 }
 
@@ -118,7 +116,7 @@ void read_data_stream(const uint8_t *data, uint32_t length) {
     kit.write(data, length);
 }
 
-void avrc_metadata_callback(uint8_t id, const uint8_t *text) { 
+void bt_metadata_callback(uint8_t id, const uint8_t *text) { 
   if(id == 2){ //Artist
     dispText(1,(char*)text);
     return;
@@ -133,17 +131,20 @@ void avrc_metadata_callback(uint8_t id, const uint8_t *text) {
 }
 
 void player_metadata_callback(MetaDataType type, const char* str, int len){
-  if(type == 0 && len > 0){ //Title
+  if(type == 0 && len > 1){ //Title
     dispText(1,(char*)str);
     return;
   }
-  if(type == 1 && len > 0){ //Album
+  if(type == 1 && len > 1){ //Album
     dispText(2,(char*)str);
     return;
   }
-  if(type == 2 && len > 0){ //Artist
+  if(type == 2 && len > 1){ //Artist
     dispText(2,(char*)str);
     return;
+  }
+  if(type == 4 && len > 1){ //name
+    snprintf(displayName, sizeof(displayName), "%s", str);    
   }
   debug("META ");
   debug(type);
@@ -171,11 +172,9 @@ void loop() {
     if(pin_request == false){
       dispText(0,"Connect Bluetooth");
       dispText(1,"Confirm PIN");
-      String pin_str = String(a2dp_sink.pin_code());
-      int str_len = pin_str.length()+1; 
-      char newChars[str_len];
-      pin_str.toCharArray(newChars,str_len);
-      dispText(2,newChars);
+      char pin[17];
+      snprintf(pin, sizeof(displayName), "%08d", a2dp_sink.pin_code());
+      dispText(2,pin);
     }
     pin_request = true;
   } else {
