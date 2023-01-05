@@ -13,8 +13,9 @@ void btnChangeMode(bool, int, void*) {
     player->stop();
     player->end();
   }
-  inetStream.end();
+  
   if (WiFi.status() == WL_CONNECTED){
+    inetStream.end(); //crashed, if WiFi is unavailable
     esp_wifi_disconnect();
   }
   esp_wifi_stop();
@@ -66,6 +67,8 @@ void startBTSpeaker(){
 
 void startRadioPlayer(){
   dispText(0,"Connecting Radio"); 
+  player_mode == ModeWebRadio;
+
   if (WiFi.status() != WL_CONNECTED && strlen(network)>0 && strlen(passwd)>0){  
       WiFi.mode(WIFI_STA);
       WiFi.config(INADDR_NONE, INADDR_NONE, INADDR_NONE, INADDR_NONE);
@@ -80,10 +83,12 @@ void startRadioPlayer(){
       }
       debugln();
   }
-  debugln("IP address: ");
+  if (WiFi.status() != WL_CONNECTED){
+    dispText(1,"Network not found");
+    return;
+  }
+  debug("IP address: ");
   debugln(WiFi.localIP());
-  if (WiFi.status() != WL_CONNECTED) return;
-  
   player = new AudioPlayer(sourceRadio, kit, decoder);
   player->setMetadataCallback(player_metadata_callback);
   decoder.begin();
@@ -91,7 +96,6 @@ void startRadioPlayer(){
   player->begin();
   debugln("Radio On");
   dispText(0,"Radio");
-  player_mode == ModeWebRadio;
 }
 
 bool SDCard_Available(){

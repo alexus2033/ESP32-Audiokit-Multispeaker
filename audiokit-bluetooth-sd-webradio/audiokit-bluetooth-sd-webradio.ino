@@ -21,7 +21,7 @@
 #define ModeSDPlayer 2
 #define ModeBTSpeaker 3
 
-#if DEBUG == 0
+#if DEBUG == 1
   #define debug(x) Serial.print(x)
   #define debugfm(x,y) Serial.print(x,y)
   #define debugln(x) Serial.println(x)
