@@ -16,12 +16,12 @@
 #define HELIX_LOGGING_ACTIVE false
   
 //additional serial output
-#define DEBUG 1
+#define DEBUG 0
 #define ModeWebRadio 1
 #define ModeSDPlayer 2
 #define ModeBTSpeaker 3
 
-#if DEBUG == 1
+#if DEBUG == 0
   #define debug(x) Serial.print(x)
   #define debugfm(x,y) Serial.print(x,y)
   #define debugln(x) Serial.println(x)
@@ -52,9 +52,6 @@ const char *urls[] = {
 void btnChangeMode(bool, int, void*);
 void btnPrevious(bool, int, void*);
 void btnNext(bool, int, void*);
-void startSDCardPlayer();
-void startRadioPlayer();
-void startBTSpeaker();
 
 AudioKitStream kit; //Board
 
@@ -82,8 +79,8 @@ bool pin_request = false;
 ////// SETUP
 void setup() {
   Serial.begin(9600);
-  AudioLogger::instance().begin(Serial, AudioLogger::Warning);
-  LOGLEVEL_AUDIOKIT = AudioKitError;
+  AudioLogger::instance().begin(Serial, AudioLogger::Error);
+  // LOGLEVEL_AUDIOKIT = AudioKitError;
   
   // provide a2dp data
   a2dp_sink.set_stream_reader(read_data_stream, false);
@@ -131,20 +128,22 @@ void bt_metadata_callback(uint8_t id, const uint8_t *text) {
 }
 
 void player_metadata_callback(MetaDataType type, const char* str, int len){
-  if(type == 0 && len > 1){ //Title
+  if(len < 1) return;
+  if(type == 0){ //Title
     dispText(1,(char*)str);
     return;
   }
-  if(type == 1 && len > 1){ //Album
+  if(type == 1){ //Album
     dispText(2,(char*)str);
     return;
   }
-  if(type == 2 && len > 1){ //Artist
+  if(type == 2){ //Artist
     dispText(2,(char*)str);
     return;
   }
-  if(type == 4 && len > 1){ //name
-    snprintf(displayName, sizeof(displayName), "%s", str);    
+  if(type == 4){ //name
+    snprintf(displayName, sizeof(displayName), "%s", str);
+    return;    
   }
   debug("META ");
   debug(type);
@@ -172,8 +171,8 @@ void loop() {
     if(pin_request == false){
       dispText(0,"Connect Bluetooth");
       dispText(1,"Confirm PIN");
-      char pin[17];
-      snprintf(pin, sizeof(displayName), "%08d", a2dp_sink.pin_code());
+      char pin[17]; //add leading zero
+      snprintf(pin, sizeof(pin), "%06d", a2dp_sink.pin_code());
       dispText(2,pin);
     }
     pin_request = true;

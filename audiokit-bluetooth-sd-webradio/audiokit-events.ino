@@ -1,10 +1,11 @@
 
 void btnChangeMode(bool, int, void*) {
+  resetDisplay();
+  
   //confim BT Pin Request
   if (player_mode == ModeBTSpeaker && a2dp_sink.pin_code() != 0) {
       a2dp_sink.confirm_pin_code();
       dispText(0,"Bluetooth");
-      resetDisplay();
       return;
   }
 
@@ -15,16 +16,16 @@ void btnChangeMode(bool, int, void*) {
   inetStream.end();
   if (WiFi.status() == WL_CONNECTED){
     esp_wifi_disconnect();
-    esp_wifi_stop();
-    esp_wifi_deinit();
   }
+  esp_wifi_stop();
+  esp_wifi_deinit();
   a2dp_sink.stop();        
   a2dp_sink.end();
   decoder.end();
-  
+
   player_mode ++;
   if(player_mode > ModeBTSpeaker){
-      player_mode = ModeWebRadio;
+      player_mode = ModeWebRadio; //jump back
   }  
   if (player_mode == ModeWebRadio){
       startRadioPlayer();
