@@ -68,7 +68,8 @@ void startBTSpeaker(){
 void startRadioPlayer(){
   dispText(0,"Connecting Radio"); 
   player_mode == ModeWebRadio;
-
+  char info[20];
+  
   if (WiFi.status() != WL_CONNECTED && strlen(network)>0 && strlen(passwd)>0){  
       WiFi.mode(WIFI_STA);
       WiFi.config(INADDR_NONE, INADDR_NONE, INADDR_NONE, INADDR_NONE);
@@ -77,7 +78,8 @@ void startRadioPlayer(){
       //WiFi.setSleep(false);
       byte timeout = 30; 
       while (WiFi.status() != WL_CONNECTED && timeout>0){
-          debug(".");
+          snprintf(info, sizeof(info), "Timeout: %d s", timeout);
+          dispText(2,info);
           delay(1000);
           timeout--; 
       }
@@ -85,10 +87,12 @@ void startRadioPlayer(){
   }
   if (WiFi.status() != WL_CONNECTED){
     dispText(1,"Network not found");
+    dispText(2,"");
     return;
   }
-  debug("IP address: ");
-  debugln(WiFi.localIP());
+  IPAddress ip = WiFi.localIP();
+  snprintf(info, sizeof(info), "IP: %d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
+  dispText(2,info);
   player = new AudioPlayer(sourceRadio, kit, decoder);
   player->setMetadataCallback(player_metadata_callback);
   decoder.begin();
@@ -141,18 +145,29 @@ void btnPrevious(bool, int, void*) {
 }
 
 void SetName(){
+  resetDisplay();
   if(player_mode == ModeSDPlayer){
     int idx = sourceSD.index();
-    const char* path = sourceSD.toStr(); 
-    snprintf(displayName, sizeof(displayName), "%d %s", idx, path);
+    char* path = (char*)sourceSD.toStr();
+    char delimiter[] = "/";
+    char* ptr = strtok(path, delimiter);
+    while(ptr != NULL)
+    { //extract FileName from Path
+      snprintf(displayName, sizeof(displayName), "%d: %s", idx+1, ptr);
+      ptr = strtok(NULL, delimiter);
+    }
     dispText(1,displayName);
   }
   if(player_mode == ModeWebRadio){
-    int idx = sourceRadio.index(); 
+    char info[20];
+    int radioIdx = sourceRadio.index();
+    snprintf(info, sizeof(info), "Stream %d", radioIdx+1);
+    dispText(1,info);
   }  
 }
 
 void resetDisplay(){
+  memset(displayName, 0, sizeof(displayName)); 
   dispText(1,"");
   dispText(2,"");
 }

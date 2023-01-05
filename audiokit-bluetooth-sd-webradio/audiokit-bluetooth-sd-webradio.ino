@@ -41,6 +41,8 @@
 #include "AudioCodecs/CodecMP3Helix.h"
 
 const char *urls[] = {
+  "https://stream.rtl.lu/live/hls/radio/eldo",
+  "https://s8-webradio.antenne.de/chillout",
   "http://stream.electroradio.fm/192k",
   "http://stream.srg-ssr.ch/m/rsj/mp3_128",
   "http://stream.srg-ssr.ch/m/drs3/mp3_128",
@@ -63,7 +65,7 @@ AudioSourceSDFAT sourceSD(startFilePath, ext, sdcfg);
 char displayName[40];
 
 //Web-Radio
-ICYStream inetStream(2048);
+ICYStream inetStream(4096);
 AudioSourceURL sourceRadio(inetStream, urls, "audio/mp3");
 char network[50];
 char passwd[50]; //read details from SD-Card
@@ -74,6 +76,7 @@ AudioPlayer *player = nullptr;
 BluetoothA2DPSink a2dp_sink;
 
 byte player_mode = ModeWebRadio;
+bool player_active = false;
 bool pin_request = false;
 
 ////// SETUP
@@ -82,15 +85,19 @@ void setup() {
   AudioLogger::instance().begin(Serial, AudioLogger::Error);
   // LOGLEVEL_AUDIOKIT = AudioKitError;
   
-  // provide a2dp data
+  resetDisplay();
+  
+  // setup A2DP
   a2dp_sink.set_stream_reader(read_data_stream, false);
   a2dp_sink.set_avrc_metadata_callback(bt_metadata_callback);
+  a2dp_sink.set_on_connection_state_changed(bt_connection_state_changed);
+  a2dp_sink.set_on_audio_state_changed(bt_play_state_changed);
   a2dp_sink.activate_pin_code(true);
   //a2dp_sink.set_discoverability(ESP_BT_NON_DISCOVERABLE);
   
   // setup output
   // volume can be controlled on the board (kit) and player (Source)
-  auto cfg = kit.defaultConfig(TX_MODE);
+  auto cfg = kit.defaultConfig(TX_MODE); 
   kit.setVolume(10); //max:100
   kit.begin(cfg);
 
@@ -129,8 +136,13 @@ void bt_metadata_callback(uint8_t id, const uint8_t *text) {
 
 void player_metadata_callback(MetaDataType type, const char* str, int len){
   if(len < 1) return;
+  byte nextLine=1;
+  if(strlen(displayName)>0){
+    dispText(1,displayName);
+    nextLine = 2;
+  }
   if(type == 0){ //Title
-    dispText(1,(char*)str);
+    dispText(nextLine,(char*)str);
     return;
   }
   if(type == 1){ //Album
@@ -141,16 +153,27 @@ void player_metadata_callback(MetaDataType type, const char* str, int len){
     dispText(2,(char*)str);
     return;
   }
+  if(type == 3){ //Genre
+    dispText(3,(char*)str);
+    return;
+  }
   if(type == 4){ //name
+    dispText(1,(char*)str);
     snprintf(displayName, sizeof(displayName), "%s", str);
     return;    
   }
-  debug("META ");
-  debug(type);
-  debug(" (");
-  debug(toStr(type));
-  debug("): ");
-  debugln(str);
+}
+
+void bt_connection_state_changed(esp_a2d_connection_state_t state, void *ptr){
+  if(state == ESP_A2D_CONNECTION_STATE_DISCONNECTED){
+    dispText(1,"Not connected");
+    dispText(2,":-(");
+  }
+}
+
+void bt_play_state_changed(esp_a2d_audio_state_t state, void *ptr){
+  player_active = (state == ESP_A2D_AUDIO_STATE_STARTED);
+  dispCall("bt0.val",player_active);
 }
 
 // write to Nextion-Display
@@ -160,6 +183,23 @@ void dispText(uint8_t id, char* str) {
   Serial.print(id);
   Serial.print(".txt=");
   Serial.print(cmd + str + cmd);
+  Serial.write(0xFF);
+  Serial.write(0xFF);
+  Serial.write(0xFF);
+}
+
+void dispCall(char* obj, bool val){
+  if(val == true){
+    dispCall(obj,"1");
+  } else {
+    dispCall(obj,"0");
+  }
+}
+
+void dispCall(char* obj, char* val){
+  Serial.print(obj);
+  Serial.print("=");
+  Serial.print(val);
   Serial.write(0xFF);
   Serial.write(0xFF);
   Serial.write(0xFF);
@@ -181,9 +221,19 @@ void loop() {
   }
   if (player && player_mode != ModeBTSpeaker) {
     player->copy();
+    player_stateCheck();
   } else {
     // feed watchdog
     delay(10);
   }
   kit.processActions();
+}
+
+//report changed value
+void player_stateCheck(){
+  if (!player){ return; } 
+  if (player->isActive() != player_active){
+      player_active = player->isActive();
+      dispCall("bt0.val",player_active);  
+  }
 }
