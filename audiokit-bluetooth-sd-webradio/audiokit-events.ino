@@ -56,8 +56,10 @@ void btnStopResume(bool, int, void*){
 }
 
 void startBTSpeaker(){
+  a2dp_sink.start(deviceName,false);
   dispText(0,"Bluetooth");
-  a2dp_sink.start("Boombox-23",false);
+  dispText(1,"Connect me:");
+  dispText(2,deviceName);
   auto cfg = kit.defaultConfig();
   cfg.sample_rate = a2dp_sink.sample_rate();
   debugln("update sample rate");
@@ -73,7 +75,7 @@ void startRadioPlayer(){
   if (WiFi.status() != WL_CONNECTED && strlen(network)>0 && strlen(passwd)>0){  
       WiFi.mode(WIFI_STA);
       WiFi.config(INADDR_NONE, INADDR_NONE, INADDR_NONE, INADDR_NONE);
-      WiFi.setHostname("Boombox-23");
+      WiFi.setHostname(deviceName);
       WiFi.begin(network, passwd);
       //WiFi.setSleep(false);
       byte timeout = 30; 
@@ -119,7 +121,8 @@ void startSDCardPlayer(){
   player->setMetadataCallback(player_metadata_callback);
   decoder.begin();
   player->setVolume(0.8);
-  player->begin();
+  player->begin(sd_index, true);
+  debugln(sd_index);
   debugln("SD-Card On");
   SetName(); 
 }
@@ -147,16 +150,19 @@ void btnPrevious(bool, int, void*) {
 void SetName(){
   resetDisplay();
   if(player_mode == ModeSDPlayer){
-    int idx = sourceSD.index();
+    sd_index = sourceSD.index();
     char* path = (char*)sourceSD.toStr();
     char delimiter[] = "/";
     char* ptr = strtok(path, delimiter);
     while(ptr != NULL)
     { //extract FileName from Path
-      snprintf(displayName, sizeof(displayName), "%d: %s", idx+1, ptr);
+      snprintf(displayName, sizeof(displayName), "%d: %s", sd_index+1, ptr);
       ptr = strtok(NULL, delimiter);
     }
     dispText(1,displayName);
+  }
+  if(player_mode == ModeBTSpeaker && a2dp_sink.is_connected()){
+    snprintf(displayName, sizeof(displayName), "%s", a2dp_sink.get_connected_source_name());
   }
   if(player_mode == ModeWebRadio){
     char info[20];

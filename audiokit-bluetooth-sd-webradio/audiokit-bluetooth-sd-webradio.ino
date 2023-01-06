@@ -10,7 +10,8 @@
 
 // install https://github.com/greiman/SdFat.git
 
-#define AUDIOKIT_BOARD 5
+//don´t forget to change AudioKitSettings.h
+#define AUDIOKIT_BOARD 1  //LyraT
 #define SD_CARD_INTR_GPIO 34
 #define USE_NEXTION_DISPLAY 1
 #define HELIX_LOGGING_ACTIVE false
@@ -41,8 +42,7 @@
 #include "AudioCodecs/CodecMP3Helix.h"
 
 const char *urls[] = {
-  "https://stream.rtl.lu/live/hls/radio/eldo",
-  "https://s8-webradio.antenne.de/chillout",
+  "http://s8-webradio.antenne.de/chillout",
   "http://stream.electroradio.fm/192k",
   "http://stream.srg-ssr.ch/m/rsj/mp3_128",
   "http://stream.srg-ssr.ch/m/drs3/mp3_128",
@@ -55,6 +55,7 @@ void btnChangeMode(bool, int, void*);
 void btnPrevious(bool, int, void*);
 void btnNext(bool, int, void*);
 
+char* deviceName = "Boombox-23";
 AudioKitStream kit; //Board
 
 //SD-Player
@@ -78,6 +79,7 @@ BluetoothA2DPSink a2dp_sink;
 byte player_mode = ModeWebRadio;
 bool player_active = false;
 bool pin_request = false;
+int sd_index = 0;
 
 ////// SETUP
 void setup() {
@@ -101,11 +103,21 @@ void setup() {
   kit.setVolume(10); //max:100
   kit.begin(cfg);
 
-  // setup buttons 
+#if AUDIOKIT_BOARD == 1
+  // setup buttons for LyraT Board
+  kit.addAction(PIN_KEY1, kit.actionVolumeDown);
+  kit.addAction(PIN_KEY2, kit.actionVolumeUp);
+  kit.addAction(BUTTON_PLAY_ID, btnChangeMode);
+  kit.addAction(BUTTON_SET_ID, btnPrevious);
+//kit.addAction(BUTTON_VOLDOWN_ID, ??); Not available(!)
+  kit.addAction(BUTTON_VOLUP_ID, btnNext);
+#else
+  // setup buttons for ai_thinker board (ES8388) 
   kit.addAction(PIN_KEY1, btnChangeMode);
-  // kit.addAction(PIN_KEY2, previous); //GPIO 19 not working
+//kit.addAction(PIN_KEY2, ??);          Not available(!)
   kit.addAction(PIN_KEY3, btnPrevious);
   kit.addAction(PIN_KEY4, btnNext);
+#endif
 
   int detectSDPin = SD_CARD_INTR_GPIO;
   if (detectSDPin>0){
