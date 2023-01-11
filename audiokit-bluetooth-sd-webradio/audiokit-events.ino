@@ -1,60 +1,3 @@
-
-void btnChangeMode(bool, int, void*) {
-  resetDisplay();
-  
-  //confim BT Pin Request
-  if (player_mode == ModeBTSpeaker && a2dp_sink.pin_code() != 0) {
-      a2dp_sink.confirm_pin_code();
-      dispText(0,"Bluetooth");
-      return;
-  }
-
-  if(player){ //stop and kill all sources
-    player->stop();
-    player->end();
-  }
-  
-  if (WiFi.status() == WL_CONNECTED){
-    inetStream.end(); //crashed, if WiFi is unavailable
-    esp_wifi_disconnect();
-  }
-  esp_wifi_stop();
-  esp_wifi_deinit();
-  a2dp_sink.stop();        
-  a2dp_sink.end();
-  decoder.end();
-
-  player_mode ++;
-  if(player_mode > ModeBTSpeaker){
-      player_mode = ModeWebRadio; //jump back
-  }  
-  if (player_mode == ModeWebRadio){
-      startRadioPlayer();
-  }
-  if (player_mode == ModeSDPlayer){     
-      startSDCardPlayer();
-  }
-  if (player_mode == ModeBTSpeaker){
-      startBTSpeaker();     
-  }
-}
-
-void btnStopResume(bool, int, void*){
-  if(player_mode == ModeBTSpeaker){
-    if(a2dp_sink.get_audio_state()==ESP_A2D_AUDIO_STATE_STARTED){
-       a2dp_sink.pause();
-    } else {
-       a2dp_sink.play();
-    }
-  }
-  if (!player){ return; } 
-  if (player->isActive()){
-    player->stop();
-  } else{
-    player->play();
-  } 
-}
-
 void startBTSpeaker(){
   a2dp_sink.start(deviceName,false);
   dispText(0,"Bluetooth");
@@ -65,11 +8,12 @@ void startBTSpeaker(){
   debugln("update sample rate");
   kit.setAudioInfo(cfg);
   debugln("A2DP On");
+  player_mode = ModeBTSpeaker;
 }
 
 void startRadioPlayer(){
   dispText(0,"Connecting Radio"); 
-  player_mode == ModeWebRadio;
+  player_mode = ModeWebRadio;
   char info[20];
   
   if (WiFi.status() != WL_CONNECTED && strlen(network)>0 && strlen(passwd)>0){  
@@ -100,6 +44,7 @@ void startRadioPlayer(){
   decoder.begin();
   player->setVolume(0.8);
   player->begin();
+  kit.setMute(false);
   debugln("Radio On");
   dispText(0,"Radio");
 }
@@ -116,6 +61,7 @@ bool SDCard_Available(){
 void startSDCardPlayer(){
   if(!SDCard_Available) return;
 
+  player_mode = ModeSDPlayer;
   dispText(0,"SD-Card");
   player = new AudioPlayer(sourceSD, kit, decoder);
   player->setMetadataCallback(player_metadata_callback);
@@ -127,24 +73,83 @@ void startSDCardPlayer(){
   SetName(); 
 }
 
+void parseInput(){
+  debug("parseInput Core: ");
+  debugln(xPortGetCoreID());
+  if(input == "modSD"){
+    player_mode_new = ModeSDPlayer;
+  }  
+  if(input == "modBT"){
+    player_mode_new = ModeBTSpeaker;
+  }
+  if(input == "modRadio"){
+    player_mode_new = ModeWebRadio;
+  }
+  if(input == "plyPause"){
+    btnStopResume(false, 0, NULL);
+  }
+  if(input == "plyPrev"){
+    btnPrevious(false, 0, NULL);
+  }
+  if(input == "plyNext"){
+    btnNext(false, 0, NULL);
+  }
+}
+
+void btnChangeMode(bool, int, void*) {
+  //confim BT Pin Request
+  if (player_mode == ModeBTSpeaker && a2dp_sink.pin_code() != 0) {
+      a2dp_sink.confirm_pin_code();
+      dispText(0,"Bluetooth");
+      return;
+  }
+  //request new Mode
+  player_mode_new = player_mode + 1;
+  if(player_mode_new > ModeBTSpeaker){
+      player_mode_new = ModeWebRadio; //jump back
+  }  
+  
+}
+
 void btnNext(bool, int, void*) {
   debugln("Player next");
+  kit.setMute(true);
   if(player && player_mode != ModeBTSpeaker){
     player->next();
   } else {
     a2dp_sink.next();
   }
   SetName();
+  kit.setMute(false);
 }
 
 void btnPrevious(bool, int, void*) {
   debugln("Player prev");
+  kit.setMute(true);
   if(player && player_mode != ModeBTSpeaker){
     player->previous();
   } else {
     a2dp_sink.previous();
   }
   SetName();
+  kit.setMute(false);
+}
+
+void btnStopResume(bool, int, void*){
+  kit.setMute(true);
+  if(player_mode == ModeBTSpeaker){
+    if(a2dp_sink.get_audio_state()==ESP_A2D_AUDIO_STATE_STARTED){
+       a2dp_sink.pause();
+    } else {
+       a2dp_sink.play();
+    }
+  }
+  if (player && player->isActive()){ 
+    player->stop();
+  } else if (player){
+      player->play();
+  }
+  kit.setMute(false);
 }
 
 void SetName(){
@@ -201,6 +206,7 @@ void readWlanFile(){
     snprintf(passwd,strlen(line), "%s",line);
   }
   file.close();
+  dispCall("btn0.val",false);
   snprintf(line,strlen(line), "Network: %s",network);
   dispText(1,line);
   debug("Passwd: ");

@@ -15,7 +15,9 @@
 #define SD_CARD_INTR_GPIO 34
 #define USE_NEXTION_DISPLAY 1
 #define HELIX_LOGGING_ACTIVE false
-  
+
+#define BTNPLAY bt0
+
 //additional serial output
 #define DEBUG 0
 #define ModeWebRadio 1
@@ -55,15 +57,17 @@ void btnChangeMode(bool, int, void*);
 void btnPrevious(bool, int, void*);
 void btnNext(bool, int, void*);
 
+TaskHandle_t Task1;
 char* deviceName = "Boombox-23";
 AudioKitStream kit; //Board
 
 //SD-Player
 const char* startFilePath="/";
 const char* ext="mp3";
-SdSpiConfig sdcfg(PIN_AUDIO_KIT_SD_CARD_CS, DEDICATED_SPI, SD_SCK_MHZ(10) , &AUDIOKIT_SD_SPI);
+SdSpiConfig sdcfg(PIN_AUDIO_KIT_SD_CARD_CS, DEDICATED_SPI, SD_SCK_MHZ(20) , &AUDIOKIT_SD_SPI);
 AudioSourceSDFAT sourceSD(startFilePath, ext, sdcfg);
 char displayName[40];
+int sd_index = 0;
 
 //Web-Radio
 ICYStream inetStream(4096);
@@ -77,18 +81,21 @@ AudioPlayer *player = nullptr;
 BluetoothA2DPSink a2dp_sink;
 
 byte player_mode = ModeWebRadio;
+byte player_mode_new = 0;
 bool player_active = false;
 bool pin_request = false;
-int sd_index = 0;
+String input;
 
 ////// SETUP
 void setup() {
   Serial.begin(9600);
   AudioLogger::instance().begin(Serial, AudioLogger::Error);
-  // LOGLEVEL_AUDIOKIT = AudioKitError;
+  LOGLEVEL_AUDIOKIT = AudioKitError;
   
   resetDisplay();
-  
+  //Hanlde Serial Events on ESP Core 0
+  xTaskCreatePinnedToCore(Task1Loop ,"InputHandler" ,10000 ,NULL ,0 ,&Task1 ,0 );
+
   // setup A2DP
   a2dp_sink.set_stream_reader(read_data_stream, false);
   a2dp_sink.set_avrc_metadata_callback(bt_metadata_callback);
@@ -102,7 +109,7 @@ void setup() {
   auto cfg = kit.defaultConfig(TX_MODE); 
   kit.setVolume(10); //max:100
   kit.begin(cfg);
-
+  
 #if AUDIOKIT_BOARD == 1
   // setup buttons for LyraT Board
   kit.addAction(PIN_KEY1, kit.actionVolumeDown);
@@ -185,7 +192,7 @@ void bt_connection_state_changed(esp_a2d_connection_state_t state, void *ptr){
 
 void bt_play_state_changed(esp_a2d_audio_state_t state, void *ptr){
   player_active = (state == ESP_A2D_AUDIO_STATE_STARTED);
-  dispCall("bt0.val",player_active);
+  dispCall("BTNPLAY.val",player_active);
 }
 
 // write to Nextion-Display
@@ -217,8 +224,14 @@ void dispCall(char* obj, char* val){
   Serial.write(0xFF);
 }
 
-//////// LOOP
-void loop() {
+/////// LOOP for Core 0
+void Task1Loop(void * pvParameters){
+for(;;){
+  if (Serial.available()) {
+        // Read out string from NEXION Display
+        input = Serial.readStringUntil('\n');
+        parseInput();
+  }
   if (a2dp_sink.pin_code() != 0) {
     if(pin_request == false){
       dispText(0,"Connect Bluetooth");
@@ -231,6 +244,11 @@ void loop() {
   } else {
     pin_request = false;
   }
+}
+}
+
+/////// LOOP for Core 1
+void loop() {
   if (player && player_mode != ModeBTSpeaker) {
     player->copy();
     player_stateCheck();
@@ -239,6 +257,40 @@ void loop() {
     delay(10);
   }
   kit.processActions();
+  player_modeCheck();
+}
+
+void player_modeCheck(){
+  if(player_mode_new == 0){
+    return; //nothing to do
+  }
+  resetDisplay();
+  kit.setMute(true);
+  if(player){ //stop and kill all sources
+    player->stop();
+    player->end();
+  }
+  
+  if (WiFi.status() == WL_CONNECTED){
+    inetStream.end(); //crashed, if WiFi is unavailable
+    esp_wifi_disconnect();
+  }
+  esp_wifi_stop();
+  esp_wifi_deinit();
+  a2dp_sink.stop();        
+  a2dp_sink.end();
+  decoder.end();
+  if (player_mode_new == ModeWebRadio){
+      startRadioPlayer();
+  }
+  if (player_mode_new == ModeSDPlayer){     
+      startSDCardPlayer();
+  }
+  if (player_mode_new == ModeBTSpeaker){
+      startBTSpeaker();     
+  }
+  player_mode_new = 0;  
+  kit.setMute(false);
 }
 
 //report changed value
@@ -247,5 +299,7 @@ void player_stateCheck(){
   if (player->isActive() != player_active){
       player_active = player->isActive();
       dispCall("bt0.val",player_active);  
+      debug("StateCheck Core: ");
+      debugln(xPortGetCoreID());
   }
 }
