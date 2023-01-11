@@ -16,5 +16,5 @@ Digital Music Player with 3 Modes:
 * [SdFat](https://github.com/greiman/SdFat.git) Reading Data from SD-Card
 
 ## Used Hardware
-* [Audio Kit Board](https://docs.ai-thinker.com/en/esp32-a1s) V2.2 A237
-* [Nextion Display](https://nextion.tech) Basic
+* [ESP32 LyraT](https://docs.espressif.com/projects/esp-adf/en/latest/design-guide/dev-boards/get-started-esp32-lyrat.html) V4.3 OR [Audio Kit Board](https://docs.ai-thinker.com/en/esp32-a1s) V2.2 A237
+* [Nextion Display](https://nextion.tech) NX4024T032 (Basic)
