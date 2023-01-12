@@ -16,8 +16,6 @@
 #define USE_NEXTION_DISPLAY 1
 #define HELIX_LOGGING_ACTIVE false
 
-#define BTNPLAY bt0
-
 //additional serial output
 #define DEBUG 0
 #define ModeWebRadio 1
@@ -192,7 +190,7 @@ void bt_connection_state_changed(esp_a2d_connection_state_t state, void *ptr){
 
 void bt_play_state_changed(esp_a2d_audio_state_t state, void *ptr){
   player_active = (state == ESP_A2D_AUDIO_STATE_STARTED);
-  dispCall("BTNPLAY.val",player_active);
+  dispCall("bt0.val",player_active);
 }
 
 // write to Nextion-Display
