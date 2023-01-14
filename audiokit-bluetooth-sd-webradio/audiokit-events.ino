@@ -51,7 +51,6 @@ void startRadioPlayer(){
 
 bool SDCard_Available(){
   int detectSDPin = SD_CARD_INTR_GPIO;
-  Serial.println(digitalRead(detectSDPin));
   if(detectSDPin>0 && digitalRead(detectSDPin) == 0){
     return true;
   }
@@ -60,7 +59,7 @@ bool SDCard_Available(){
 }
 
 void startSDCardPlayer(){
-  if(!SDCard_Available) return;
+  if(!SDCard_Available()) return;
 
   player_mode = ModeSDPlayer;
   dispText(0,"SD-Card");
@@ -185,8 +184,6 @@ void resetDisplay(){
 }
 
 void readWlanFile(){
-  if(!SDCard_Available) return;
-  
   char line[50];
   SdFat sd;
   SdFile file;

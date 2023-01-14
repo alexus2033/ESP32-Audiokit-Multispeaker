@@ -134,8 +134,11 @@ void setup() {
   if (detectSDPin>0){
     pinMode(detectSDPin, INPUT_PULLUP);
   }
-  readWlanFile();
-  startRadioPlayer();
+  if(SDCard_Available()){
+    readWlanFile();
+    player_mode_new = ModeWebRadio;
+  } 
+  
 }
 
 // Write data to AudioKit in callback
