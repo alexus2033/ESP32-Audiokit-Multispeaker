@@ -66,8 +66,10 @@ const char* ext="mp3";
 SdSpiConfig sdcfg(PIN_AUDIO_KIT_SD_CARD_CS, DEDICATED_SPI, SD_SCK_MHZ(20) , &AUDIOKIT_SD_SPI);
 AudioSourceSDFAT sourceSD(startFilePath, ext, sdcfg);
 char displayName[40];
-int radio_index = 0;
-int sd_index = 0;
+int radio_index = -1;
+int blue_index = -1;
+int blue_tracks = 0;
+int sd_index = -1;
 
 //Web-Radio
 ICYStream inetStream(4096);
@@ -141,44 +143,50 @@ void read_data_stream(const uint8_t *data, uint32_t length) {
     kit.write(data, length);
 }
 
+// Display Bluetooth-Metadata
 void bt_metadata_callback(uint8_t id, const uint8_t *text) { 
-  if(id == 2){ //Artist
+  if(id == ESP_AVRC_MD_ATTR_ARTIST){
     dispText(1,(char*)text);
     return;
   }
-  if(id == 1){ //Title
-    dispText(2,(char*)text);
+  if(id == ESP_AVRC_MD_ATTR_TITLE){
+    if(strcmp((char*)text,"Not Provided")!=0){
+      dispText(2,(char*)text);
+    }
     return;
   }
-  debug("META ");
-  debug(id); //1,8,16
-  debug(": "); 
+  if(id == ESP_AVRC_MD_ATTR_TRACK_NUM) {
+    blue_index = atoi((char*)text);
+    dispText(3,(char*)text);
+    debugln(blue_index);
+  }
+  if(id == ESP_AVRC_MD_ATTR_NUM_TRACKS) {
+    blue_tracks = atoi((char*)text);
+  }
 }
 
+// Display MP3 Metadata
 void player_metadata_callback(MetaDataType type, const char* str, int len){
   if(len < 1) return;
   byte nextLine=1;
-  if(strlen(displayName)>0){
+  if(strlen(displayName)>1){
     dispText(1,displayName);
     nextLine = 2;
   }
-  if(type == 0){ //Title
+  if(type == audio_tools::Title){
     dispText(nextLine,(char*)str);
     return;
   }
-  if(type == 1){ //Album
+  if(type == audio_tools::Album || 
+     type == audio_tools::Artist){ 
     dispText(2,(char*)str);
     return;
   }
-  if(type == 2){ //Artist
-    dispText(2,(char*)str);
-    return;
-  }
-  if(type == 3){ //Genre
+  if(type == audio_tools::Genre){
     dispText(3,(char*)str);
     return;
   }
-  if(type == 4){ //name
+  if(type == audio_tools::Name){
     dispText(1,(char*)str);
     snprintf(displayName, sizeof(displayName), "%s", str);
     return;    
@@ -189,6 +197,10 @@ void bt_connection_state_changed(esp_a2d_connection_state_t state, void *ptr){
   if(state == ESP_A2D_CONNECTION_STATE_DISCONNECTED){
     dispText(1,"Not connected");
     dispText(2,":-(");
+  }
+  if(state == ESP_A2D_CONNECTION_STATE_CONNECTED){
+    dispText(1,"Connected with");
+    dispText(2,(char*)a2dp_sink.get_connected_source_name());
   }
 }
 
@@ -277,6 +289,7 @@ void player_modeCheck(){
     inetStream.end(); //crashed, if WiFi is unavailable
     esp_wifi_disconnect();
   }
+  debugln(WiFi.getMode());
   esp_wifi_stop();
   esp_wifi_deinit();
   a2dp_sink.stop();        
@@ -300,7 +313,9 @@ void player_stateCheck(){
   if (!player){ return; }
   if (player->isActive() != player_active){
       player_active = player->isActive();
-      dispCall("bt0.val",player_active);  
+      dispCall("bt0.val",player_active);
+      debug("StateCheck Core: ");
+      debugln(xPortGetCoreID());
   }
   if(player_mode == ModeSDPlayer && sd_index != sourceSD.index()){
     ReadFileName();
@@ -308,6 +323,4 @@ void player_stateCheck(){
   if(player_mode == ModeWebRadio && radio_index != sourceRadio.index()){
     ReadFileName();
   }
-  debug("StateCheck Core: ");
-  debugln(xPortGetCoreID());
 }

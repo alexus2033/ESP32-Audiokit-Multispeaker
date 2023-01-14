@@ -68,7 +68,11 @@ void startSDCardPlayer(){
   player->setMetadataCallback(player_metadata_callback, SELECT_ANY);
   decoder.begin();
   player->setVolume(0.8);
-  player->begin(sd_index, true);
+  if(sd_index < 0){
+    player->begin();
+  } else { //start at last position
+    player->begin(sd_index, true);
+  }
   debugln("SD-Card On");
 }
 
@@ -170,7 +174,7 @@ void ReadFileName(){
     dispText(1,info);
   }
   if(player_mode == ModeBTSpeaker && a2dp_sink.is_connected()){
-    snprintf(displayName, sizeof(displayName), "%s", a2dp_sink.get_connected_source_name());
+    snprintf(displayName, sizeof(displayName), "Title %d/%d", blue_index, blue_tracks);
   }  
 }
 
