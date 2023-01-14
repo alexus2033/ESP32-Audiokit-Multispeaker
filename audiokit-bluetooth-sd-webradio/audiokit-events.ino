@@ -40,7 +40,7 @@ void startRadioPlayer(){
   snprintf(info, sizeof(info), "IP: %d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
   dispText(2,info);
   player = new AudioPlayer(sourceRadio, kit, decoder);
-  player->setMetadataCallback(player_metadata_callback);
+  player->setMetadataCallback(player_metadata_callback, SELECT_ICY);
   decoder.begin();
   player->setVolume(0.8);
   player->begin();
@@ -51,6 +51,7 @@ void startRadioPlayer(){
 
 bool SDCard_Available(){
   int detectSDPin = SD_CARD_INTR_GPIO;
+  Serial.println(digitalRead(detectSDPin));
   if(detectSDPin>0 && digitalRead(detectSDPin) == 0){
     return true;
   }
@@ -64,13 +65,11 @@ void startSDCardPlayer(){
   player_mode = ModeSDPlayer;
   dispText(0,"SD-Card");
   player = new AudioPlayer(sourceSD, kit, decoder);
-  player->setMetadataCallback(player_metadata_callback);
+  player->setMetadataCallback(player_metadata_callback, SELECT_ANY);
   decoder.begin();
   player->setVolume(0.8);
   player->begin(sd_index, true);
-  debugln(sd_index);
   debugln("SD-Card On");
-  SetName(); 
 }
 
 void parseInput(){
@@ -103,7 +102,7 @@ void btnChangeMode(bool, int, void*) {
       dispText(0,"Bluetooth");
       return;
   }
-  //request new Mode
+  //request next Mode
   player_mode_new = player_mode + 1;
   if(player_mode_new > ModeBTSpeaker){
       player_mode_new = ModeWebRadio; //jump back
@@ -119,7 +118,6 @@ void btnNext(bool, int, void*) {
   } else {
     a2dp_sink.next();
   }
-  SetName();
   kit.setMute(false);
 }
 
@@ -131,7 +129,6 @@ void btnPrevious(bool, int, void*) {
   } else {
     a2dp_sink.previous();
   }
-  SetName();
   kit.setMute(false);
 }
 
@@ -152,7 +149,7 @@ void btnStopResume(bool, int, void*){
   kit.setMute(false);
 }
 
-void SetName(){
+void ReadFileName(){
   resetDisplay();
   if(player_mode == ModeSDPlayer){
     sd_index = sourceSD.index();
@@ -166,14 +163,14 @@ void SetName(){
     }
     dispText(1,displayName);
   }
+  if(player_mode == ModeWebRadio){
+    radio_index = sourceRadio.index();
+    char info[20];
+    snprintf(info, sizeof(info), "Stream %d", radio_index+1);
+    dispText(1,info);
+  }
   if(player_mode == ModeBTSpeaker && a2dp_sink.is_connected()){
     snprintf(displayName, sizeof(displayName), "%s", a2dp_sink.get_connected_source_name());
-  }
-  if(player_mode == ModeWebRadio){
-    char info[20];
-    int radioIdx = sourceRadio.index();
-    snprintf(info, sizeof(info), "Stream %d", radioIdx+1);
-    dispText(1,info);
   }  
 }
 
