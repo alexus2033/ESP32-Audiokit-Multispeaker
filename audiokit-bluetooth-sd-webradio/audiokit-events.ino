@@ -152,7 +152,8 @@ void btnStopResume(bool, int, void*){
   kit.setMute(false);
 }
 
-void ReadFileName(){
+// update current title info
+void updateTitleInfo(){
   resetDisplay();
   if(player_mode == ModeSDPlayer){
     sd_index = sourceSD.index();

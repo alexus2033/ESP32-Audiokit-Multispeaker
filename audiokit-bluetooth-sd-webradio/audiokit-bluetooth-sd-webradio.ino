@@ -84,8 +84,10 @@ BluetoothA2DPSink a2dp_sink;
 
 byte player_mode = ModeWebRadio;
 byte player_mode_new = 0;
+byte player_pos = 0; //SD-Read Position
 bool player_active = false;
 bool pin_request = false;
+unsigned long dTimer = 0;
 String input;
 
 ////// SETUP
@@ -320,10 +322,19 @@ void player_stateCheck(){
       debug("StateCheck Core: ");
       debugln(xPortGetCoreID());
   }
+  // Update current play position
+  if(player_mode == ModeSDPlayer && millis() - dTimer > 1000){
+    dTimer = millis();
+    byte pPos = sourceSD.positionPercent();
+    if(player_pos != pPos){
+      player_pos = pPos;
+      Serial.printf("%d %%\n", pPos);
+    }
+  }
   if(player_mode == ModeSDPlayer && sd_index != sourceSD.index()){
-    ReadFileName();
+    updateTitleInfo();
   }
   if(player_mode == ModeWebRadio && radio_index != sourceRadio.index()){
-    ReadFileName();
+    updateTitleInfo();
   }
 }
