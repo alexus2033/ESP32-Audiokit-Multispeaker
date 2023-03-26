@@ -1,6 +1,8 @@
 # ESP32-Audiokit-Multispeaker
 ESP32-Audiokit Webradio, SD-Player and Bluetooth-Speaker
 
+![AI Thinker Audio Kit](https://github.com/alexus2033/ESP32-Audiokit-Multispeaker/blob/main/docs/AI%20Thinker%20Audio%20Kit.jpg)
+
 ## Features
 Digital Music Player with 3 Modes:
 * Listen to [Web Radio Stations](https://wiki.ubuntuusers.de/Internetradio/Stationen) MP3
